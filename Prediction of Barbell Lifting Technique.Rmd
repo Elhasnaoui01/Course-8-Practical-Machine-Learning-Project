@@ -1,0 +1,122 @@
+---
+title: "Predicting the Manner of Exercise"
+author: "Elhasnaoui"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Introduction
+
+This project involves analyzing data collected from accelerometers on the belt, forearm, arm, and dumbbell of six participants performing barbell lifts. The goal is to predict the manner in which the participants did the exercise using the "classe" variable. 
+
+## Data Exploration
+
+```{r setup, include=FALSE}
+# Load necessary libraries
+library(tidyverse)
+library(caret)
+library(randomForest)
+library(e1071)
+```
+
+## Load data
+
+```{r}
+# Load the training and test data
+train_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+test_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+training <- read.csv(train_url, na.strings = c("NA", "#DIV/0!", ""))
+testing <- read.csv(test_url, na.strings = c("NA", "#DIV/0!", ""))
+
+# Summary of the dataset
+summary(training)
+```
+
+## Data Preprocessing
+
+```{r}
+# Remove columns with near-zero variance
+nzv <- nearZeroVar(training, saveMetrics = TRUE)
+training <- training[, !nzv$nzv]
+
+# Remove columns with missing values
+training <- training[, colSums(is.na(training)) == 0]
+
+# Remove unnecessary columns (e.g., IDs, timestamps)
+training <- training %>% select(-c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, num_window,))
+
+# Ensure testing set has the same columns as the training set
+testing <- testing %>% select(names(training)[-ncol(training)])
+```
+
+## Model Building
+
+```{r}
+# Set seed for reproducibility
+set.seed(12345)
+
+# Convert 'classe' to a factor
+training$classe <- as.factor(training$classe)
+
+# Partition the data into training and validation sets
+inTrain <- createDataPartition(training$classe, p = 0.7, list = FALSE)
+trainSet <- training[inTrain,]
+valSet <- training[-inTrain,]
+
+# Train a Random Forest model
+rfModel <- randomForest(classe ~ ., data = trainSet)
+varImpPlot(rfModel)
+```
+
+## Cross-Validation and Model Evaluation
+
+```{r}
+# Predict on validation set
+predictions <- predict(rfModel, valSet)
+
+# Confusion matrix and accuracy
+confusionMatrix(predictions, valSet$classe)
+```
+
+## Test Set Predictions
+
+```{r}
+# Predict on the test set
+testPredictions <- predict(rfModel, testing)
+testPredictions
+```
+
+# Conclusion
+
+## 1. Accuracy and Performance:
+Accuracy: The model achieved an accuracy of 99.68%, meaning it correctly classified the manner of exercise in 99.68% of cases. This is a very high level of accuracy.
+Kappa: The Kappa statistic is 0.9959, which indicates almost perfect agreement between the predicted and actual classes. A Kappa value close to 1 suggests that the model is performing exceptionally well.
+95% Confidence Interval (CI): The confidence interval for accuracy is (0.995, 0.9981), showing that even in the worst case, the model is highly accurate.
+
+## 2. Class-wise Performance:
+Sensitivity (Recall): Sensitivity values are near 100% for all classes, indicating that the model is highly effective at correctly identifying each class (A-E).
+The lowest sensitivity is for Class D at 98.96%, but even this is very high.
+Specificity: Specificity values are also near 100% for all classes, meaning the model rarely misclassifies other classes as a specific class.
+Pos Pred Value (Precision): The precision is also high across all classes, showing that when the model predicts a class, it's almost always correct.
+Balanced Accuracy: The balanced accuracy, which is the average of sensitivity and specificity, is also close to 100% for all classes.
+
+## 3. Confusion Matrix:
+The confusion matrix shows very few misclassifications:
+Only 4 out of 1677 instances of Class A were misclassified as Class B.
+Class B had 3 misclassifications, 2 as Class C and 1 as Class A.
+Class C had 11 misclassifications, most of which were classified as Class D.
+Class D had just 1 misclassification as Class E.
+Class E had no misclassifications, indicating perfect predictions for this class.
+
+## 4. Predictions on Test Set:
+The model's predictions on the test set (20 samples) yielded a variety of classes (A, B, C, D, E), indicating that it successfully applied the learned patterns to unseen data.
+These predictions align well with the performance metrics from the training set, suggesting that the model generalizes well.
+Overall Assessment:
+This Random Forest model is highly effective for classifying the manner in which exercises were performed, achieving near-perfect accuracy and excellent performance metrics across all classes. The minimal misclassifications and high precision, recall, and balanced accuracy make this model reliable for practical use.
+
+# Appendix
+R Packages Used:
+randomForest: For building the Random Forest model.
+caret: For data partitioning and model evaluation.
+dplyr: For data manipulation.
